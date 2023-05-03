@@ -39,6 +39,8 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	flusher.Flush()
+
 	for {
 		select {
 		case message := <-msgChan:
