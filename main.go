@@ -11,7 +11,7 @@ import (
 
 var msgChan chan string
 
-func timeHandler(c *gin.Context) {
+func getTime(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
 
 	if msgChan != nil {
@@ -21,6 +21,7 @@ func timeHandler(c *gin.Context) {
 }
 
 func sseHandler(c *gin.Context) {
+	fmt.Println("Client connected")
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -40,6 +41,8 @@ func sseHandler(c *gin.Context) {
 	for {
 		select {
 		case message := <-msgChan:
+			fmt.Println("case message... sending message")
+			fmt.Println(message)
 			c.String(http.StatusOK, "data: %s\n\n", message)
 			c.Writer.Flush()
 
@@ -53,7 +56,7 @@ func sseHandler(c *gin.Context) {
 func main() {
 	r := gin.Default()
 	r.GET("/event", sseHandler)
-	r.GET("/time", timeHandler)
+	r.GET("/time", getTime)
 
 	log.Fatal(r.Run(":8080"))
 }
