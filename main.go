@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -32,7 +31,7 @@ func sseHandler(c echo.Context) error {
 		if msgChan != nil {
 			close(msgChan)
 			msgChan = nil
-			fmt.Println("Client closed connection")
+			fmt.Printf("Client %v closed connection\n", c.Request().RemoteAddr)
 		}
 	}()
 
