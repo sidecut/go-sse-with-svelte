@@ -9,7 +9,7 @@ import (
 
 var msgChan chan string
 
-func timeHandler(w http.ResponseWriter, r *http.Request) {
+func getTime(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if msgChan != nil {
@@ -19,12 +19,14 @@ func timeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func sseHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Client connected")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
 	msgChan = make(chan string)
+
 	defer func() {
 		if msgChan != nil {
 			close(msgChan)
@@ -35,8 +37,7 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-		return
+		fmt.Println("Could not init http.Flusher")
 	}
 
 	flusher.Flush()
@@ -44,20 +45,23 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case message := <-msgChan:
+			fmt.Println("case message... sending message")
+			fmt.Println(message)
 			fmt.Fprintf(w, "data: %s\n\n", message)
 			flusher.Flush()
-
 		case <-r.Context().Done():
-			fmt.Printf("Client %v disconnected from SSE.\n", r.RemoteAddr)
+			fmt.Println("Client closed connection")
 			return
 		}
 	}
+
 }
 
 func main() {
 	router := http.NewServeMux()
+
 	router.HandleFunc("/event", sseHandler)
-	router.HandleFunc("/time", timeHandler)
+	router.HandleFunc("/time", getTime)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
