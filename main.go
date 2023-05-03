@@ -41,7 +41,7 @@ func sseHandler(c echo.Context) error {
 	for {
 		select {
 		case message := <-msgChan:
-			c.String(http.StatusOK, fmt.Sprintf("data: %s\n\n", message))
+			c.Response().Writer.Write([]byte(fmt.Sprintf("data: %s\n\n", message)))
 			c.Response().Flush()
 
 		case <-c.Request().Context().Done():
