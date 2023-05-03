@@ -5,12 +5,14 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 var msgChan chan string
 
-func timeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+func timeHandler(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
 
 	if msgChan != nil {
 		msg := time.Now().Format(time.TimeOnly)
@@ -18,11 +20,11 @@ func timeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func sseHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+func sseHandler(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
 
 	msgChan = make(chan string)
 	defer func() {
@@ -33,31 +35,25 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	flusher.Flush()
+	c.Writer.Flush()
 
 	for {
 		select {
 		case message := <-msgChan:
-			fmt.Fprintf(w, "data: %s\n\n", message)
-			flusher.Flush()
+			c.String(http.StatusOK, "data: %s\n\n", message)
+			c.Writer.Flush()
 
-		case <-r.Context().Done():
-			fmt.Printf("Client %v disconnected from SSE.\n", r.RemoteAddr)
+		case <-c.Done():
+			fmt.Printf("Client %v disconnected from SSE.\n", c.Request.RemoteAddr)
 			return
 		}
 	}
 }
 
 func main() {
-	router := http.NewServeMux()
-	router.HandleFunc("/event", sseHandler)
-	router.HandleFunc("/time", timeHandler)
+	r := gin.Default()
+	r.GET("/event", sseHandler)
+	r.GET("/time", timeHandler)
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(r.Run(":8080"))
 }
