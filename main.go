@@ -26,9 +26,11 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 
 	msgChan = make(chan string)
 	defer func() {
-		close(msgChan)
-		msgChan = nil
-		fmt.Println("Client closed connection")
+		if msgChan != nil {
+			close(msgChan)
+			msgChan = nil
+			fmt.Println("Client closed connection")
+		}
 	}()
 
 	flusher, ok := w.(http.Flusher)
