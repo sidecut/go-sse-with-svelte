@@ -2,27 +2,30 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/labstack/echo/v4"
 )
 
 var msgChan chan string
 
-func timeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+func timeHandler(c echo.Context) error {
+	c.Response().Header().Set("Access-Control-Allow-Origin", "*")
 
 	if msgChan != nil {
 		msg := time.Now().Format(time.TimeOnly)
 		msgChan <- msg
 	}
+
+	return nil
 }
 
-func sseHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+func sseHandler(c echo.Context) error {
+	c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+	c.Response().Header().Set("Content-Type", "text/event-stream")
+	c.Response().Header().Set("Cache-Control", "no-cache")
+	c.Response().Header().Set("Connection", "keep-alive")
 
 	msgChan = make(chan string)
 	defer func() {
@@ -33,31 +36,24 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	flusher.Flush()
+	c.Response().Flush()
 
 	for {
 		select {
 		case message := <-msgChan:
-			fmt.Fprintf(w, "data: %s\n\n", message)
-			flusher.Flush()
+			c.String(http.StatusOK, fmt.Sprintf("data: %s\n\n", message))
+			c.Response().Flush()
 
-		case <-r.Context().Done():
-			fmt.Printf("Client %v disconnected from SSE.\n", r.RemoteAddr)
-			return
+		case <-c.Request().Context().Done():
+			fmt.Printf("Client %v disconnected from SSE.\n", c.Request().RemoteAddr)
+			return nil
 		}
 	}
 }
 
 func main() {
-	router := http.NewServeMux()
-	router.HandleFunc("/event", sseHandler)
-	router.HandleFunc("/time", timeHandler)
-
-	log.Fatal(http.ListenAndServe(":8080", router))
+	e := echo.New()
+	e.GET("/event", sseHandler)
+	e.GET("/time", timeHandler)
+	e.Logger.Fatal(e.Start(":8080"))
 }
